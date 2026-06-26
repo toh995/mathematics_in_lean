@@ -35,7 +35,24 @@ theorem convergesTo_add {s t : ℕ → ℝ} {a b : ℝ}
   rcases cs (ε / 2) ε2pos with ⟨Ns, hs⟩
   rcases ct (ε / 2) ε2pos with ⟨Nt, ht⟩
   use max Ns Nt
-  sorry
+  intro n hn
+
+  calc
+    |s n + t n - (a + b)| = |(s n - a) + (t n - b)| := by
+      congr
+      ring
+    _ ≤ |s n - a| + |t n - b| := by
+      apply abs_add_le (s n - a) (t n - b)
+    _ < ε/2 + ε/2 := by
+      have h1 : |s n - a| < ε/2 := by
+        have : n ≥ Ns := le_of_max_le_left hn
+        exact hs n this
+      have h2 : |t n - b| < ε/2 := by
+        have : n ≥ Nt := le_of_max_le_right hn
+        exact ht n this
+      exact add_lt_add h1 h2
+    _ = ε := by
+      norm_num
 
 theorem convergesTo_mul_const {s : ℕ → ℝ} {a : ℝ} (c : ℝ) (cs : ConvergesTo s a) :
     ConvergesTo (fun n ↦ c * s n) (c * a) := by
@@ -45,14 +62,31 @@ theorem convergesTo_mul_const {s : ℕ → ℝ} {a : ℝ} (c : ℝ) (cs : Conver
       ring
     rw [h]
     ring
-  have acpos : 0 < |c| := abs_pos.mpr h
-  sorry
+  · have acpos : 0 < |c| := abs_pos.mpr h
+    intro ε εpos
+    have : ε / |c| > 0 := by exact div_pos εpos acpos
+    rcases cs (ε/|c|) this with ⟨N, hN⟩
+    use N
+    intro n hn
+
+    calc
+      |c * s n - c * a| = |c * (s n - a)| := by rw [← mul_sub]
+      _ = |c| * |s n - a| := by exact abs_mul c (s n - a)
+      _ < |c| * (ε/|c|) := by exact (mul_lt_mul_iff_of_pos_left acpos).mpr (hN n hn)
+      _ = ε := by
+        have : |c| ≠ 0 := by exact abs_ne_zero.mpr h
+        exact mul_div_cancel₀ ε this
 
 theorem exists_abs_le_of_convergesTo {s : ℕ → ℝ} {a : ℝ} (cs : ConvergesTo s a) :
     ∃ N b, ∀ n, N ≤ n → |s n| < b := by
-  rcases cs 1 zero_lt_one with ⟨N, h⟩
+  rcases cs 1 zero_lt_one with ⟨N, hN⟩
   use N, |a| + 1
-  sorry
+  intro n hn
+  calc
+    |s n| = |s n - a + a| := by ring_nf
+    _ ≤ |s n - a| + |a| := by exact abs_add_le (s n - a) a
+    _ < 1 + |a| := by exact (add_lt_add_iff_right |a|).mpr (hN n hn)
+    _ = |a| + 1 := by rw[add_comm]
 
 theorem aux {s t : ℕ → ℝ} {a : ℝ} (cs : ConvergesTo s a) (ct : ConvergesTo t 0) :
     ConvergesTo (fun n ↦ s n * t n) 0 := by
@@ -61,8 +95,27 @@ theorem aux {s t : ℕ → ℝ} {a : ℝ} (cs : ConvergesTo s a) (ct : Converges
   rcases exists_abs_le_of_convergesTo cs with ⟨N₀, B, h₀⟩
   have Bpos : 0 < B := lt_of_le_of_lt (abs_nonneg _) (h₀ N₀ (le_refl _))
   have pos₀ : ε / B > 0 := div_pos εpos Bpos
-  rcases ct _ pos₀ with ⟨N₁, h₁⟩
-  sorry
+  rcases ct (ε/B) pos₀ with ⟨N₁, h₁⟩
+  use max N₀ N₁
+  intro n hn
+  calc
+    |s n * t n - 0| = |s n * t n| := by rw [sub_zero]
+    _ = |s n| * |t n| := by exact abs_mul (s n) (t n)
+    _ < B * (ε/B) := by
+      have h0 : |s n| < B := by
+        have : n ≥ N₀ := by exact le_of_max_le_left hn
+        exact h₀ n this
+      have h1 : |t n| < ε/B := by
+        have : n ≥ N₁ := by exact le_of_max_le_right hn
+        have : |t n - 0| < ε/B := by exact h₁ n this
+        rw [← sub_zero (t n)]
+        exact this
+      exact mul_lt_mul_of_nonneg h0 h1 (abs_nonneg _) (abs_nonneg _)
+    _ = ε := by
+      have : B ≠ 0 := by
+        symm
+        exact ne_of_lt Bpos
+      exact mul_div_cancel₀ ε this
 
 theorem convergesTo_mul {s t : ℕ → ℝ} {a b : ℝ}
       (cs : ConvergesTo s a) (ct : ConvergesTo t b) :
@@ -80,7 +133,7 @@ theorem convergesTo_unique {s : ℕ → ℝ} {a b : ℝ}
       (sa : ConvergesTo s a) (sb : ConvergesTo s b) :
     a = b := by
   by_contra abne
-  have : |a - b| > 0 := by sorry
+  have : |a - b| > 0 := by exact abs_sub_pos.mpr abne
   let ε := |a - b| / 2
   have εpos : ε > 0 := by
     change |a - b| / 2 > 0
@@ -88,9 +141,27 @@ theorem convergesTo_unique {s : ℕ → ℝ} {a b : ℝ}
   rcases sa ε εpos with ⟨Na, hNa⟩
   rcases sb ε εpos with ⟨Nb, hNb⟩
   let N := max Na Nb
-  have absa : |s N - a| < ε := by sorry
-  have absb : |s N - b| < ε := by sorry
-  have : |a - b| < |a - b| := by sorry
+  have absa : |s N - a| < ε := by
+    have : N ≥ Na := by exact le_max_left _ _
+    exact hNa N this
+  have absb : |s N - b| < ε := by
+    have : N ≥ Nb := by exact le_max_right _ _
+    exact hNb N this
+
+  have h1 : |a - b| ≤ |s N - a| + |s N - b| := by
+    calc
+      |a - b| = |a - b + s N - s N| := by ring_nf
+      _ = |(a - s N) + (s N - b)| := by ring_nf
+      _ ≤ |a - s N| + |s N - b| := by exact abs_add_le _ _
+      _ = |s N - a| + |s N - b| := by rw [abs_sub_comm]
+
+  have h2 : |s N - a| + |s N - b| < |a - b| := by
+    calc
+      |s N - a| + |s N - b| < ε + ε := by exact add_lt_add absa absb
+      _ = |a - b|/2 + |a-b|/2 := by dsimp
+      _ = |a - b| := by exact add_halves _
+
+  have : |a - b| < |a - b| := by exact lt_of_le_of_lt h1 h2
   exact lt_irrefl _ this
 
 section
@@ -100,4 +171,3 @@ def ConvergesTo' (s : α → ℝ) (a : ℝ) :=
   ∀ ε > 0, ∃ N, ∀ n ≥ N, |s n - a| < ε
 
 end
-
